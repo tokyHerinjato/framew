@@ -15,4 +15,14 @@ cd src
 echo javac -cp %LIB_SERVLET% -d ..\classes *.java
 javac -cp "%LIB_SERVLET%" -d ..\classes *.java
 
+REM Création du fichier JAR à partir des classes compilées
+cd ..
+echo jar -cf framework.jar -C classes .
+jar -cf framework.jar -C classes .
 
+REM Copie du fichier JAR vers le répertoire de destination
+echo copy framework.jar "%DESTINATION_DIR%\lib"
+copy framework.jar "%DESTINATION_DIR%\lib"
+
+REM Affichage du message de fin de compilation
+echo Compilation terminée
