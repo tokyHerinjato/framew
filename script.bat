@@ -1,28 +1,52 @@
 @echo off
-REM Compile Framework
 
-REM Définir les répertoires de destination
-set "DESTINATION_DIR=D:\Andry\ITU\S4\Mr Naina\Sprint\Sprint-0\test\WEB-INF"
-set "LIB_SERVLET=C:\xampp\tomcat\lib\servlet-api.jar"
 
-REM Vérifier si le répertoire de destination existe, sinon le créer
-if not exist "%DESTINATION_DIR%\lib" (
-    mkdir "%DESTINATION_DIR%\lib"
+set SRC_DIR=src
+set LIB_DIR=lib
+set OUT_DIR=out
+set OUT_JAR=FrontServlet.jar
+
+
+:ErrorExit
+echo %1
+exit /b 1
+
+
+echo Compilation des classes Java...
+mkdir %OUT_DIR%
+if %errorlevel% neq 0 call :ErrorExit "Échec de la création du répertoire %OUT_DIR%."
+
+
+echo Listage des fichiers sources Java...
+del sources.txt 2>nul
+for /r %SRC_DIR% %%f in (*.java) do echo %%f >> sources.txt
+
+
+javac -cp "%LIB_DIR%/*" -d %OUT_DIR% @sources.txt
+if %errorlevel% neq 0 (
+    call :ErrorExit "Échec de la compilation. Veuillez vérifier les erreurs."
+) else (
+    echo Compilation réussie.
 )
 
-REM Compilation des fichiers Java
-cd src
-echo javac -cp %LIB_SERVLET% -d ..\classes *.java
-javac -cp "%LIB_SERVLET%" -d ..\classes *.java
 
-REM Création du fichier JAR à partir des classes compilées
-cd ..
-echo jar -cf framework.jar -C classes .
-jar -cf framework.jar -C classes .
+echo Création du fichier JAR...
+jar cf %OUT_JAR% -C %OUT_DIR% .
+if %errorlevel% neq 0 (
+    call :ErrorExit "Échec de la création du fichier JAR."
+) else (
+    echo Fichier JAR créé: %OUT_JAR%
+)
 
-REM Copie du fichier JAR vers le répertoire de destination
-echo copy framework.jar "%DESTINATION_DIR%\lib"
-copy framework.jar "%DESTINATION_DIR%\lib"
 
-REM Affichage du message de fin de compilation
-echo Compilation terminée
+echo Nettoyage...
+del sources.txt
+rmdir /s /q %OUT_DIR%
+if %errorlevel% neq 0 (
+    call :ErrorExit "Échec de la suppression du répertoire %OUT_DIR%."
+) else (
+    echo Répertoire %OUT_DIR% supprimé.
+)
+
+echo Terminé.
+exit /b 0
