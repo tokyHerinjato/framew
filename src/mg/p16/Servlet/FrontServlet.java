@@ -60,6 +60,14 @@ public class FrontServlet extends HttpServlet {
             }
         } catch (Exception e) {
             // TODO: handle exception
+        if (mappings.containsKey(path)) {
+            Mapping m = mappings.get(path);
+            out.print("\n");
+            out.println("Nom de la classe : " + m.getClassName());
+            out.println("Nom de la méthode : " + m.getMethodeName());
+        } else {
+            out.print("\n");
+            out.println("Aucune méthode associé a cette url");
         }
         // out.println(this.mappings.v);
 
