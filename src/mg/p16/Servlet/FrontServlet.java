@@ -35,13 +35,15 @@ public class FrontServlet extends HttpServlet {
         this.controllerNames = this.getListeControllers(this.controllerPackage, out);
         // initialisation du hashMap
         this.mappings = this.getMethodFromController(controllerNames, out);
-        System.out.println("---------------------dqzdiqhidhqiuzd----------");
 
         String path = this.getURIWithoutContextPath(request);
+        out.println(path);
         /* Prendre le mapping correspondant a l'url */
         if (mappings.containsKey(path)) {
+            Mapping m = mappings.get(path);
             out.print("\n");
             out.println("Nom de la classe : " + m.getClassName());
+            out.println("Nom de la méthode : " + m.getMethodeName());
         } else {
             out.print("\n");
             out.println("Aucune méthode associé a cette url");
@@ -126,7 +128,21 @@ public class FrontServlet extends HttpServlet {
             for (String controller : controllers) {
                 Class<?> clazz = Class.forName(controller);
                 Method[] methods = clazz.getDeclaredMethods();
-                
+                for (Method m : methods) {
+                    if (m.isAnnotationPresent(MappingAnnotation.class)) {
+                        String url = m.getAnnotation(MappingAnnotation.class).value();
+                        if (res.containsKey(url)) {
+                            String methodPresent = res.get(url).getClassName() + ":" + res.get(url).getMethodeName();
+                            String new_method = clazz.getName() + "." + m.getName();
+                            try {
+                                throw new Exception("url dumped ... ok");
+                            } catch (Exception e) {
+                                // TODO: handle exception
+                            }
+                        }
+                        res.put(m.getAnnotation(MappingAnnotation.class).value(), new Mapping(controller, m.getName()));
+                    }
+                }
             }
         } catch (Exception e) {
             // TODO: handle exception
