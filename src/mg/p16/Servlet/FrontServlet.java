@@ -50,8 +50,10 @@ public class FrontServlet extends HttpServlet {
                 Class<?> clizz = Class.forName(m.getClassName());
                 // récuperer la methode par son nom
                 Method mixx = clizz.getMethod(m.getMethodeName());
-                out.println("-**************");
                 // invoquer la methode sur l'instance de la classe
+                Object result = mixx.invoke(null);
+                out.println("résultat de la methode : " + result);
+                // -----------------------------------------------
             } else {
                 out.print("\n");
                 out.println("Aucune méthode associé a cette url");
@@ -78,6 +80,16 @@ public class FrontServlet extends HttpServlet {
 
     public String getServletInfo() {
         return "FrontServlet";
+    }
+
+    public Method getMethodByName(Mapping m, Class<?> clizz) {
+        Method[] methods = clizz.getDeclaredMethods();
+        for (Method method : methods) {
+            if (method.getName().equals(m.getMethodeName())) {
+                return method;
+            }
+        }
+        return null;
     }
 
     public ArrayList<String> getListeControllers(String packageName, PrintWriter out) {
