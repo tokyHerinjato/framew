@@ -7,6 +7,7 @@ import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
@@ -18,6 +19,7 @@ import javax.servlet.http.HttpServletResponse;
 import mg.p16.Annotation.ControllerAnnotation;
 import mg.p16.Annotation.MappingAnnotation;
 import mg.p16.Util.Mapping;
+import mg.p16.Util.ModelView;
 
 public class FrontServlet extends HttpServlet {
     private String controllerPackage;
@@ -68,6 +70,40 @@ public class FrontServlet extends HttpServlet {
         } else {
             out.print("\n");
             out.println("Aucune méthode associé a cette url");
+        try {
+            if (mappings.containsKey(path)) {
+                Mapping m = mappings.get(path);
+                out.print("\n");
+                out.println("Nom de la classe : " + m.getClassName());
+                out.println("Nom de la méthode : " + m.getMethodeName());
+                out.println("-------------------------------");
+                /// recuperer la classe par son nom
+                Class<?> clizz = Class.forName(m.getClassName());
+                // récuperer la methode par son nom
+                Method mixx = clizz.getMethod(m.getMethodeName());
+                // invoquer la methode sur l'instance de la classe
+                Object result = mixx.invoke(null);
+                out.println("résultat de la methode : " + result);
+                // ----------------------------------------------- SPRINT 4
+                if (result.getClass().getSimpleName().equals("String")) {
+                    out.println(result);
+                } else if (result.getClass().getSimpleName().equals("ModelView")) {
+                    // recuperation de l'url
+                    String url_goal = ((ModelView) result).getUrl();
+                    for (Map.Entry<String, Object> entry : ((ModelView) result).getData().entrySet()) {
+                        String key = entry.getKey();
+                        Object value = entry.getValue();
+                        request.setAttribute(key, value);
+                    }
+                    // dispatch vers cet url et envoi des donnée
+                    request.getRequestDispatcher(url_goal).forward(request, response);
+                }
+            } else {
+                out.print("\n");
+                out.println("Aucune méthode associé a cette url");
+            }
+        } catch (Exception e) {
+            // TODO: handle exception
         }
         // out.println(this.mappings.v);
 
