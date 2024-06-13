@@ -3,6 +3,8 @@
 set src_dir=src
 set lib_dir=lib
 set return_dir=return
+set out_jar=D:\Andry\ITU\S4\Naina\Sprint\Sprint-3
+=======
 set out_jar=D:\Andry\ITU\S4\Naina\Sprint\Sprint-2
 
 echo compilation des classes Java ...
@@ -29,6 +31,11 @@ echo création du fichier JAR ...
 echo jar -cf FrontServlet.jar -C return .
 jar -cf FrontServlet.jar -C return .
 
+if exist D:\Andry\ITU\S4\Naina\Sprint\Sprint-3\proj\WEB-INF\lib\FrontServlet.jar (
+    del D:\Andry\ITU\S4\Naina\Sprint\Sprint-3\proj\WEB-INF\lib\FrontServlet.jar
+)
+copy FrontServlet.jar D:\Andry\ITU\S4\Naina\Sprint\Sprint-3\proj\WEB-INF\lib
+=======
 if exist D:\Andry\ITU\S4\Naina\Sprint\Sprint-2\proj\WEB-INF\lib\FrontServlet.jar (
     del D:\Andry\ITU\S4\Naina\Sprint\Sprint-2\proj\WEB-INF\lib\FrontServlet.jar
 )

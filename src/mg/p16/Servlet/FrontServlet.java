@@ -39,6 +39,27 @@ public class FrontServlet extends HttpServlet {
         String path = this.getURIWithoutContextPath(request);
         out.println(path);
         /* Prendre le mapping correspondant a l'url */
+        try {
+            if (mappings.containsKey(path)) {
+                Mapping m = mappings.get(path);
+                out.print("\n");
+                out.println("Nom de la classe : " + m.getClassName());
+                out.println("Nom de la méthode : " + m.getMethodeName());
+                out.println("-------------------------------");
+                /// recuperer la classe par son nom
+                Class<?> clizz = Class.forName(m.getClassName());
+                // récuperer la methode par son nom
+                Method mixx = clizz.getMethod(m.getMethodeName());
+                // invoquer la methode sur l'instance de la classe
+                Object result = mixx.invoke(null);
+                out.println("résultat de la methode : " + result);
+                // -----------------------------------------------
+            } else {
+                out.print("\n");
+                out.println("Aucune méthode associé a cette url");
+            }
+        } catch (Exception e) {
+            // TODO: handle exception
         if (mappings.containsKey(path)) {
             Mapping m = mappings.get(path);
             out.print("\n");
@@ -67,6 +88,16 @@ public class FrontServlet extends HttpServlet {
 
     public String getServletInfo() {
         return "FrontServlet";
+    }
+
+    public Method getMethodByName(Mapping m, Class<?> clizz) {
+        Method[] methods = clizz.getDeclaredMethods();
+        for (Method method : methods) {
+            if (method.getName().equals(m.getMethodeName())) {
+                return method;
+            }
+        }
+        return null;
     }
 
     public ArrayList<String> getListeControllers(String packageName, PrintWriter out) {
