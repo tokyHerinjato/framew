@@ -12,11 +12,17 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.RequestDispatcher;
 
 import java.lang.reflect.*;
-
 import mg.p16.annotations.*;
 import mg.p16.utils.*;
 
 public class FrontController extends HttpServlet {
+    private List<String> controllers;
+    private HashMap<String, Mapping> map;
+
+import mg.p16.annotations.*;
+import mg.p16.utils.*;
+
+public class FrontServlet extends HttpServlet {
     private List<String> controllers;
     private HashMap<String, Mapping> map;
 
