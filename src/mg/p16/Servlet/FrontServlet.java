@@ -1,223 +1,97 @@
-package mg.p16.Servlet;
+package mg.p16.servlet;
 
-import java.io.*;
-import java.lang.reflect.Method;
-import java.net.URL;
-import java.net.URLDecoder;
-import java.util.ArrayList;
-import java.util.Enumeration;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.HashMap;
-import java.util.Map;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
+import java.util.List;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.RequestDispatcher;
 
-import mg.p16.Annotation.ControllerAnnotation;
-import mg.p16.Annotation.MappingAnnotation;
-import mg.p16.Util.Mapping;
-import mg.p16.Util.ModelView;
+import java.lang.reflect.*;
+
+import mg.p16.annotations.*;
+import mg.p16.utils.*;
 
 public class FrontServlet extends HttpServlet {
-    private String controllerPackage;
-    private ArrayList<String> controllerNames;
-    private HashMap<String, Mapping> mappings;
+    private List<String> controllers;
+    private HashMap<String, Mapping> map;
 
+    @Override
     public void init() throws ServletException {
-        this.controllerPackage = "mg.p16.Controller";
+        String packageToScan = this.getInitParameter("package");
+        try {
+            this.controllers = new Function().getAllclazzsStringAnnotation(packageToScan, AnnotationController.class);
+            this.map = new Function().scanControllersMethods(this.controllers);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        processRequest(req, resp);
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        processRequest(req, resp);
     }
 
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         PrintWriter out = response.getWriter();
-        // initialisation des controllers
-        this.controllerNames = this.getListeControllers(this.controllerPackage, out);
-        // initialisation du hashMap
-        this.mappings = this.getMethodFromController(controllerNames, out);
+        String path = new Function().getURIWithoutContextPath(request);
 
-        String path = this.getURIWithoutContextPath(request);
-        out.println(path);
-        /* Prendre le mapping correspondant a l'url */
-        try {
-            if (mappings.containsKey(path)) {
-                Mapping m = mappings.get(path);
-                out.print("\n");
-                out.println("Nom de la classe : " + m.getClassName());
-                out.println("Nom de la méthode : " + m.getMethodeName());
-                out.println("-------------------------------");
-                /// recuperer la classe par son nom
-                Class<?> clizz = Class.forName(m.getClassName());
-                // récuperer la methode par son nom
-                Method mixx = clizz.getMethod(m.getMethodeName());
-                // invoquer la methode sur l'instance de la classe
-                Object result = mixx.invoke(null);
-                out.println("résultat de la methode : " + result);
-                // -----------------------------------------------
-            } else {
-                out.print("\n");
-                out.println("Aucune méthode associé a cette url");
-            }
-        } catch (Exception e) {
-            // TODO: handle exception
-        if (mappings.containsKey(path)) {
-            Mapping m = mappings.get(path);
-            out.print("\n");
-            out.println("Nom de la classe : " + m.getClassName());
-            out.println("Nom de la méthode : " + m.getMethodeName());
-        } else {
-            out.print("\n");
-            out.println("Aucune méthode associé a cette url");
-        try {
-            if (mappings.containsKey(path)) {
-                Mapping m = mappings.get(path);
-                out.print("\n");
-                out.println("Nom de la classe : " + m.getClassName());
-                out.println("Nom de la méthode : " + m.getMethodeName());
-                out.println("-------------------------------");
-                /// recuperer la classe par son nom
-                Class<?> clizz = Class.forName(m.getClassName());
-                // récuperer la methode par son nom
-                Method mixx = clizz.getMethod(m.getMethodeName());
-                // invoquer la methode sur l'instance de la classe
-                Object result = mixx.invoke(null);
-                out.println("résultat de la methode : " + result);
-                // ----------------------------------------------- SPRINT 4
-                if (result.getClass().getSimpleName().equals("String")) {
-                    out.println(result);
-                } else if (result.getClass().getSimpleName().equals("ModelView")) {
-                    // recuperation de l'url
-                    String url_goal = ((ModelView) result).getUrl();
-                    for (Map.Entry<String, Object> entry : ((ModelView) result).getData().entrySet()) {
-                        String key = entry.getKey();
-                        Object value = entry.getValue();
-                        request.setAttribute(key, value);
-                    }
-                    // dispatch vers cet url et envoi des donnée
-                    request.getRequestDispatcher(url_goal).forward(request, response);
-                }
-            } else {
-                out.print("\n");
-                out.println("Aucune méthode associé a cette url");
-            }
-        } catch (Exception e) {
-            // TODO: handle exception
+        if (path.contains("?")) {
+            int index = path.indexOf("?");
+            path = path.substring(0, index);
         }
-        // out.println(this.mappings.v);
 
-        String requestedPage = request.getPathInfo();
-        out.println("path : /" + requestedPage);
-
-    }
-
-    protected void doGet(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-        processRequest(request, response);
-    }
-
-    protected void doPost(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-        processRequest(request, response);
-    }
-
-    public String getServletInfo() {
-        return "FrontServlet";
-    }
-
-    public Method getMethodByName(Mapping m, Class<?> clizz) {
-        Method[] methods = clizz.getDeclaredMethods();
-        for (Method method : methods) {
-            if (method.getName().equals(m.getMethodeName())) {
-                return method;
-            }
-        }
-        return null;
-    }
-
-    public ArrayList<String> getListeControllers(String packageName, PrintWriter out) {
-        ArrayList<String> controllerClasses = new ArrayList<>();
-        String path = packageName.replace('.', '/');
-
-        try {
-            Enumeration<URL> resources = getClass().getClassLoader().getResources(path);
-            while (resources.hasMoreElements()) {
-                URL resource = resources.nextElement();
-                out.println("Scanning: " + resource);
-                if (resource.getProtocol().equals("file")) {
-                    File directory = new File(URLDecoder.decode(resource.getFile(), "UTF-8"));
-                    if (directory.exists() && directory.isDirectory()) {
-                        File[] files = directory.listFiles();
-                        if (files != null) {
-                            for (File file : files) {
-                                if (file.isFile() && file.getName().endsWith(".class")) {
-                                    String className = packageName + "." + file.getName().replace(".class", "");
-                                    try {
-                                        Class<?> clazz = Class.forName(className);
-                                        if (clazz.isAnnotationPresent(ControllerAnnotation.class)) {
-                                            controllerClasses.add(clazz.getName());
-                                        }
-                                    } catch (Exception e) {
-                                        // TODO: handle exception
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else if (resource.getProtocol().equals("jar")) {
-                    String jarPath = resource.getPath().substring(5, resource.getPath().indexOf("!"));
-                    try (JarFile jarFile = new JarFile(URLDecoder.decode(jarPath, "UTF-8"))) {
-                        Enumeration<JarEntry> entries = jarFile.entries();
-                        while (entries.hasMoreElements()) {
-                            JarEntry entry = entries.nextElement();
-                            if (entry.getName().startsWith(path) && entry.getName().endsWith(".class")) {
-                                String className = entry.getName().replace('/', '.').replace(".class", "");
-                                Class<?> clazz = Class.forName(className);
-                                if (clazz.isAnnotationPresent(ControllerAnnotation.class)) {
-                                    controllerClasses.add(clazz.getName());
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace(out);
-        }
-        return controllerClasses;
-    }
-
-    public HashMap<String, Mapping> getMethodFromController(ArrayList<String> controllers, PrintWriter out) {
-        HashMap<String, Mapping> res = new HashMap<>();
-        try {
-            out.println("Scanning 2 method");
-            for (String controller : controllers) {
-                Class<?> clazz = Class.forName(controller);
+        if (map.containsKey(path)) {
+            Mapping m = map.get(path);
+            try {
+                Class<?> clazz = Class.forName(m.getClassName());
                 Method[] methods = clazz.getDeclaredMethods();
-                for (Method m : methods) {
-                    if (m.isAnnotationPresent(MappingAnnotation.class)) {
-                        String url = m.getAnnotation(MappingAnnotation.class).value();
-                        if (res.containsKey(url)) {
-                            String methodPresent = res.get(url).getClassName() + ":" + res.get(url).getMethodeName();
-                            String new_method = clazz.getName() + "." + m.getName();
-                            try {
-                                throw new Exception("url dumped ... ok");
-                            } catch (Exception e) {
-                                // TODO: handle exception
-                            }
-                        }
-                        res.put(m.getAnnotation(MappingAnnotation.class).value(), new Mapping(controller, m.getName()));
+                Method targetMethod = null;
+
+                for (Method method : methods) {
+                    if (method.getName().equals(m.getMethodName())) {
+                        targetMethod = method;
+                        break;
                     }
                 }
-            }
-        } catch (Exception e) {
-            // TODO: handle exception
-        }
-        return res;
-    }
 
-    public String getURIWithoutContextPath(HttpServletRequest request) {
-        return request.getRequestURI().substring(request.getContextPath().length());
+                if (targetMethod != null) {
+                    Object result = targetMethod.invoke(clazz.newInstance(), params);
+
+                    if (result instanceof String) {
+                        out.println(
+                                "Resultat de l'execution de la méthode " + " " + m.getMethodName() + " est " + result);
+                    } else if (result instanceof ModelView) {
+                        ModelView modelView = (ModelView) result;
+                        String destinationUrl = modelView.getUrl();
+                        HashMap<String, Object> data = modelView.getData();
+                        for (String key : data.keySet()) {
+                            request.setAttribute(key, data.get(key));
+                        }
+                        RequestDispatcher dispatcher = request.getRequestDispatcher(destinationUrl);
+                        dispatcher.forward(request, response);
+                    } else {
+                        out.println("Le type de retour n'est ni un String ni un ModelView");
+                    }
+                } else {
+                    out.println("Méthode non trouvée : " + m.getMethodName());
+                }
+            } catch (Exception e) {
+                out.println("Erreur lors de l'exécution de la méthode : " + e.getMessage());
+                e.printStackTrace(out);
+            }
+        } else {
+            out.println("404 NOT FOUND");
+        }
     }
 }
