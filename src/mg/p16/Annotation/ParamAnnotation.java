@@ -1,4 +1,4 @@
-package mg.p16.annotations;
+package mg.p16.Annotation;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
