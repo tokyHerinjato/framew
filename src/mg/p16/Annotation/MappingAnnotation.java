@@ -1,4 +1,4 @@
-package mg.p16.annotations;
+package mg.p16.Annotation;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -6,6 +6,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.TYPE)
-public @interface AnnotationController {
+@Target(ElementType.METHOD)
+public @interface MappingAnnotation {
+    String value();
 }

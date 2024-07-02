@@ -18,24 +18,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.RequestDispatcher;
 
-import java.lang.reflect.*;
-import mg.p16.annotations.*;
-import mg.p16.utils.*;
-
-public class FrontController extends HttpServlet {
-    private List<String> controllers;
-    private HashMap<String, Mapping> map;
-
-import mg.p16.annotations.*;
-import mg.p16.utils.*;
-
-public class FrontServlet extends HttpServlet {
-    private List<String> controllers;
-    private HashMap<String, Mapping> map;
-
-    @Override
-    public void init() throws ServletException {
-        String packageToScan = this.getInitParameter("package");
 import mg.p16.Annotation.ControllerAnnotation;
 import mg.p16.Annotation.FieldAnnotation;
 import mg.p16.Annotation.MappingAnnotation;
@@ -43,6 +25,7 @@ import mg.p16.Annotation.ParamAnnotation;
 import mg.p16.Annotation.ParamObjectAnnotation;
 import mg.p16.Util.Mapping;
 import mg.p16.Util.ModelView;
+import mg.p16.Util.MySession;
 
 public class FrontServlet extends HttpServlet {
     private String controllerPackage;
@@ -94,7 +77,7 @@ public class FrontServlet extends HttpServlet {
                         }
 
                         out.println("Invoking method: " + mixx.getName() + " on class: " + clizz.getName());
-                        Object[] params = this.getParameterValue(request, mixx, ParamAnnotation.class);
+                        Object[] params = this.getParameterValue(request, mixx, ParamAnnotation.class, out);
                         Object result = mixx.invoke(clizz.newInstance(), params);
                         out.println("Résultat de la méthode : " + result);
 
@@ -102,9 +85,13 @@ public class FrontServlet extends HttpServlet {
                             ModelView modelView = (ModelView) result;
                             String urlGoal = modelView.getUrl();
                             out.println("Forwarding to URL: " + urlGoal);
-                            for (Map.Entry<String, Object> entry : modelView.getData().entrySet()) {
-                                request.setAttribute(entry.getKey(), entry.getValue());
-                                out.println("Setting attribute: " + entry.getKey() + " = " + entry.getValue());
+                            HashMap<String, Object> data = modelView.getData();
+                            System.out.println(data);
+                            if (data != null) {
+                                for (String key : data.keySet()) {
+                                    request.setAttribute(key, data.get(key));
+                                    out.println("Setting attribute: " + key + " = " + data.get(key));
+                                }
                             }
                             request.getRequestDispatcher(urlGoal).forward(request, response);
                         } else if (result instanceof String) {
@@ -113,9 +100,7 @@ public class FrontServlet extends HttpServlet {
                             out.println("error return type");
                         }
                     } catch (Exception e) {
-                        out.println("Error during method invocation:");
-                        e.printStackTrace(out);
-                        throw new ServletException(e);
+                        out.println(e.getMessage());
                     }
                 } else {
                     out.println("Aucune méthode associée à cette URL ou 404 not found");
@@ -123,7 +108,7 @@ public class FrontServlet extends HttpServlet {
             }
         } catch (Exception e) {
             out.println("General error:");
-            e.printStackTrace(out);
+            out.println(e.getMessage());
         }
 
         String requestedPage = request.getPathInfo();
@@ -153,7 +138,7 @@ public class FrontServlet extends HttpServlet {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // e.printStackTrace();
         }
         return null;
     }
@@ -198,7 +183,7 @@ public class FrontServlet extends HttpServlet {
                                         }
                                     }
                                 } catch (ClassNotFoundException e) {
-                                    e.printStackTrace();
+                                    // e.printStackTrace();
                                 }
                             }
                         }
@@ -218,7 +203,7 @@ public class FrontServlet extends HttpServlet {
                                     controllerClasses.add(clazz.getName());
                                 }
                             } catch (ClassNotFoundException e) {
-                                e.printStackTrace();
+                                // e.printStackTrace();
                             }
                         }
                     }
@@ -245,16 +230,13 @@ public class FrontServlet extends HttpServlet {
                         } else {
                             urlMap.put(url, clazz.getName() + "." + m.getName());
                             if (!res.containsKey(url)) {
-                                // for (Parameter p : m.getParameters()) {
-                                // Object value = p.getAnnotation(ParamAnnotation.class).value();
-                                // }
                                 res.put(url, new Mapping(controller, m.getName()));
                             }
                         }
                     }
                 }
             } catch (ClassNotFoundException e) {
-                e.printStackTrace();
+                // e.printStackTrace();
             }
         }
         return res;
@@ -289,21 +271,29 @@ public class FrontServlet extends HttpServlet {
     }
 
     public static Object[] getParameterValue(HttpServletRequest request, Method method,
-            Class<ParamAnnotation> annotationClass) {
+            Class<ParamAnnotation> annotationClass, PrintWriter out) throws Exception {
         Parameter[] parameters = method.getParameters();
         Object[] parameterValues = new Object[parameters.length];
-        for (int i = 0; i < parameters.length; i++) {
-            Parameter parameter = parameters[i];
-            if (parameter.isAnnotationPresent(ParamAnnotation.class)) {
-                String paramName = parameter.getAnnotation(ParamAnnotation.class).value();
-                parameterValues[i] = request.getParameter(paramName);
-            } else if (parameter.isAnnotationPresent(ParamObjectAnnotation.class)) {
-                try {
+        try {
+            for (int i = 0; i < parameters.length; i++) {
+                Parameter parameter = parameters[i];
+                if (parameter.getType().equals(MySession.class)) {
+                    parameterValues[i] = new MySession(request.getSession());
+                    System.out.println("req.getSession()");
+                } else if (parameter.isAnnotationPresent(ParamAnnotation.class)) {
+                    String paramName = parameter.getAnnotation(ParamAnnotation.class).value();
+                    parameterValues[i] = request.getParameter(paramName);
+                } else if (parameter.isAnnotationPresent(ParamObjectAnnotation.class)) {
                     parameterValues[i] = createParamObject(parameter.getType(), request);
-                } catch (Exception e) {
-
+                } else {
+                    throw new Exception("ETU002479 : Erreur servlet de parametre misy tsy annoté");
                 }
             }
+        } catch (
+
+        Exception e) {
+            // e.printStackTrace(out);
+            out.println(e.getMessage());
         }
         return parameterValues;
     }
