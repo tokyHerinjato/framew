@@ -11,6 +11,9 @@ public class ModelView {
         this.data = new HashMap<>();
     }
 
+    public ModelView() {
+    }
+
     public ModelView(String url, HashMap<String, Object> data) {
         this.url = url;
         this.data = data != null ? data : new HashMap<>(); // Ensure data is not null
