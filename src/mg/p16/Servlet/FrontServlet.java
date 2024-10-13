@@ -18,9 +18,13 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.RequestDispatcher;
 
+import com.google.gson.Gson;
+
 import mg.p16.Annotation.ControllerAnnotation;
 import mg.p16.Annotation.FieldAnnotation;
-import mg.p16.Annotation.MappingAnnotation;
+import mg.p16.Annotation.JsonAnnotation;
+import mg.p16.Annotation.GET;
+import mg.p16.Annotation.POST;
 import mg.p16.Annotation.ParamAnnotation;
 import mg.p16.Annotation.ParamObjectAnnotation;
 import mg.p16.Util.Mapping;
@@ -34,17 +38,17 @@ public class FrontServlet extends HttpServlet {
 
     public void init() {
         this.controllerPackage = "mg.p16.Controller";
-        try {
-            this.controllerNames = this.getListeControllers(this.controllerPackage);
-            this.mappings = this.getMethodFromController(controllerNames);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         PrintWriter out = response.getWriter();
+        try {
+            this.controllerNames = this.getListeControllers(this.controllerPackage, request);
+            this.mappings = this.getMethodFromController(controllerNames);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         String path = this.getURIWithoutContextPath(request);
         if (path.contains("?")) {
             int index = path.indexOf("?");
@@ -61,13 +65,27 @@ public class FrontServlet extends HttpServlet {
                     out.println("Nom de la méthode : " + m.getMethodeName());
                     out.println("-------------------------------");
 
+                    // begin sprint 10
+                    String methodVerb = m.getVerb();
+                    String requestMethod = request.getMethod();
+
+                    if(!requestMethod.equalsIgnoreCase(methodVerb)) {
+                        throw new Exception("Error method from jsp page : "+methodVerb+" must be "+requestMethod);
+                    }
+
                     try {
                         Class<?> clizz = Class.forName(m.getClassName());
                         Method mixx = null;
                         for (Method method : clizz.getDeclaredMethods()) {
                             if (method.getName().equals(m.getMethodeName())) {
-                                mixx = method;
-                                break;
+                                if(requestMethod.equalsIgnoreCase("GET") && method.isAnnotationPresent(GET.class)) {
+                                    mixx = method;
+                                    break;
+                                }
+                                if(requestMethod.equalsIgnoreCase("POST") && method.isAnnotationPresent(POST.class)) {
+                                    mixx = method;
+                                    break;
+                                }
                             }
                         }
 
@@ -79,12 +97,28 @@ public class FrontServlet extends HttpServlet {
                         out.println("Invoking method: " + mixx.getName() + " on class: " + clizz.getName());
                         Object[] params = this.getParameterValue(request, mixx, ParamAnnotation.class, out);
                         Object result = mixx.invoke(clizz.newInstance(), params);
-                        out.println("Résultat de la méthode : " + result);
+                        out.println("Resultat de la méthode : " + result);
 
+                        if(mixx.isAnnotationPresent(JsonAnnotation.class)) {
+                            if(result instanceof ModelView) {                                
+                                response.setContentType("application/json");
+                                Gson gson = new Gson();
+                                ModelView modelView = (ModelView) result;
+                                System.out.println("tonga eto eto yyyyy");
+                                HashMap<String, Object> data = modelView.getData();
+                                System.out.println("tonga eto eto xpppp");
+                                String inona = gson.toJson(data);
+                            } else {
+                                response.setContentType("application/json");
+                                Gson gson = new Gson();
+                                String inona = gson.toJson(result);
+                                out.println(inona);
+                            }
+                        }
                         if (result instanceof ModelView) {
                             ModelView modelView = (ModelView) result;
-                            String urlGoal = modelView.getUrl();
-                            out.println("Forwarding to URL: " + urlGoal);
+                            String GETGoal = modelView.getGET();
+                            out.println("Forwarding to GET: " + GETGoal);
                             HashMap<String, Object> data = modelView.getData();
                             System.out.println(data);
                             if (data != null) {
@@ -93,7 +127,7 @@ public class FrontServlet extends HttpServlet {
                                     out.println("Setting attribute: " + key + " = " + data.get(key));
                                 }
                             }
-                            request.getRequestDispatcher(urlGoal).forward(request, response);
+                            request.getRequestDispatcher(GETGoal).forward(request, response);
                         } else if (result instanceof String) {
                             out.println(result.toString());
                         } else {
@@ -103,7 +137,7 @@ public class FrontServlet extends HttpServlet {
                         out.println(e.getMessage());
                     }
                 } else {
-                    out.println("Aucune méthode associée à cette URL ou 404 not found");
+                    out.println("Aucune méthode associée à cette GET ou 404 not found");
                 }
             }
         } catch (Exception e) {
@@ -160,7 +194,7 @@ public class FrontServlet extends HttpServlet {
         return instance;
     }
 
-    public ArrayList<String> getListeControllers(String packageName) throws IOException {
+    public ArrayList<String> getListeControllers(String packageName, HttpServletRequest request) throws IOException {
         ArrayList<String> controllerClasses = new ArrayList<>();
         String path = packageName.replace('.', '/');
         Enumeration<URL> resources = getClass().getClassLoader().getResources(path);
@@ -179,6 +213,27 @@ public class FrontServlet extends HttpServlet {
                                     Class<?> clazz = Class.forName(className);
                                     if (clazz != null) {
                                         if (clazz.isAnnotationPresent(ControllerAnnotation.class)) {
+                                            Field tempField = null;
+                                            for (Field field : clazz.getDeclaredFields()) {
+                                                if (field.getType().equals(MySession.class)) {
+                                                    try {
+                                                        tempField = field;
+                                                        break;
+                                                    } catch (Exception e) {
+                                                        System.out.println("error set field : " + e.getMessage());
+                                                    }
+                                                }
+                                            }
+                                            if (tempField != null) {
+                                                try {
+                                                    tempField.setAccessible(true);
+                                                    tempField.set(clazz.getDeclaredConstructor().newInstance(),
+                                                            new MySession(request.getSession()));
+                                                    System.out.println("ReqX.getSession");
+                                                } catch (Exception err) {
+                                                    System.out.println(err.getMessage());
+                                                }
+                                            }
                                             controllerClasses.add(clazz.getName());
                                         }
                                     }
@@ -216,23 +271,34 @@ public class FrontServlet extends HttpServlet {
     public HashMap<String, Mapping> getMethodFromController(ArrayList<String> controllers)
             throws IOException {
         HashMap<String, Mapping> res = new HashMap<>();
-        HashMap<String, String> urlMap = new HashMap<>();
+        HashMap<String, String> urlMapping = new HashMap<>();
 
         for (String controller : controllers) {
             try {
                 Class<?> clazz = Class.forName(controller);
                 Method[] methods = clazz.getDeclaredMethods();
                 for (Method m : methods) {
-                    if (m.isAnnotationPresent(MappingAnnotation.class)) {
-                        String url = m.getAnnotation(MappingAnnotation.class).value();
-                        if (urlMap.containsKey(url)) {
-                            throw new IOException("url" + url + " already associated");
+                    if (m.isAnnotationPresent(GET.class)) {
+                        String GET = m.getAnnotation(GET.class).value();
+                        if (urlMapping.containsKey(GET)) {
+                            throw new IOException("GET" + GET + " already associated");
                         } else {
-                            urlMap.put(url, clazz.getName() + "." + m.getName());
-                            if (!res.containsKey(url)) {
-                                res.put(url, new Mapping(controller, m.getName()));
+                            urlMapping.put(GET, clazz.getName() + "." + m.getName());
+                            if (!res.containsKey(GET)) {
+                                res.put(GET, new Mapping(controller, m.getName(), "GET"));
                             }
                         }
+                    } else if(m.isAnnotationPresent(POST.class)) {
+                        String POST = m.getAnnotation(POST.class).value();
+                        if (urlMapping.containsKey(POST)) {
+                            throw new IOException("POST" + POST + " already associated");
+                        } else {
+                            urlMapping.put(POST, clazz.getName() + "." + m.getName());
+                            if (!res.containsKey(POST)) {
+                                res.put(POST, new Mapping(controller, m.getName(), "POST"));
+                            }
+                        }
+                        
                     }
                 }
             } catch (ClassNotFoundException e) {
@@ -289,9 +355,7 @@ public class FrontServlet extends HttpServlet {
                     throw new Exception("ETU002479 : Erreur servlet de parametre misy tsy annoté");
                 }
             }
-        } catch (
-
-        Exception e) {
+        } catch (Exception e) {
             // e.printStackTrace(out);
             out.println(e.getMessage());
         }
