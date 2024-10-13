@@ -83,7 +83,7 @@ public class FrontServlet extends HttpServlet {
                         Object[] params = this.getParameterValue(request, mixx, ParamAnnotation.class, out);
                         Object result = mixx.invoke(clizz.newInstance(), params);
                         out.println("Resultat de la méthode : " + result);
-
+                        // sprint 9 begin
                         if(mixx.isAnnotationPresent(JsonAnnotation.class)) {
                             if(result instanceof ModelView) {                                
                                 response.setContentType("application/json");
