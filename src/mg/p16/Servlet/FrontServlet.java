@@ -18,8 +18,11 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.RequestDispatcher;
 
+import com.google.gson.Gson;
+
 import mg.p16.Annotation.ControllerAnnotation;
 import mg.p16.Annotation.FieldAnnotation;
+import mg.p16.Annotation.JsonAnnotation;
 import mg.p16.Annotation.MappingAnnotation;
 import mg.p16.Annotation.ParamAnnotation;
 import mg.p16.Annotation.ParamObjectAnnotation;
@@ -34,17 +37,17 @@ public class FrontServlet extends HttpServlet {
 
     public void init() {
         this.controllerPackage = "mg.p16.Controller";
-        try {
-            this.controllerNames = this.getListeControllers(this.controllerPackage);
-            this.mappings = this.getMethodFromController(controllerNames);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         PrintWriter out = response.getWriter();
+        try {
+            this.controllerNames = this.getListeControllers(this.controllerPackage, request);
+            this.mappings = this.getMethodFromController(controllerNames);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         String path = this.getURIWithoutContextPath(request);
         if (path.contains("?")) {
             int index = path.indexOf("?");
@@ -79,8 +82,24 @@ public class FrontServlet extends HttpServlet {
                         out.println("Invoking method: " + mixx.getName() + " on class: " + clizz.getName());
                         Object[] params = this.getParameterValue(request, mixx, ParamAnnotation.class, out);
                         Object result = mixx.invoke(clizz.newInstance(), params);
-                        out.println("Résultat de la méthode : " + result);
-
+                        out.println("Resultat de la méthode : " + result);
+                        // sprint 9 begin
+                        if(mixx.isAnnotationPresent(JsonAnnotation.class)) {
+                            if(result instanceof ModelView) {                                
+                                response.setContentType("application/json");
+                                Gson gson = new Gson();
+                                ModelView modelView = (ModelView) result;
+                                System.out.println("tonga eto eto yyyyy");
+                                HashMap<String, Object> data = modelView.getData();
+                                System.out.println("tonga eto eto xpppp");
+                                String inona = gson.toJson(data);
+                            } else {
+                                response.setContentType("application/json");
+                                Gson gson = new Gson();
+                                String inona = gson.toJson(result);
+                                out.println(inona);
+                            }
+                        }
                         if (result instanceof ModelView) {
                             ModelView modelView = (ModelView) result;
                             String urlGoal = modelView.getUrl();
@@ -160,7 +179,7 @@ public class FrontServlet extends HttpServlet {
         return instance;
     }
 
-    public ArrayList<String> getListeControllers(String packageName) throws IOException {
+    public ArrayList<String> getListeControllers(String packageName, HttpServletRequest request) throws IOException {
         ArrayList<String> controllerClasses = new ArrayList<>();
         String path = packageName.replace('.', '/');
         Enumeration<URL> resources = getClass().getClassLoader().getResources(path);
@@ -179,6 +198,27 @@ public class FrontServlet extends HttpServlet {
                                     Class<?> clazz = Class.forName(className);
                                     if (clazz != null) {
                                         if (clazz.isAnnotationPresent(ControllerAnnotation.class)) {
+                                            Field tempField = null;
+                                            for (Field field : clazz.getDeclaredFields()) {
+                                                if (field.getType().equals(MySession.class)) {
+                                                    try {
+                                                        tempField = field;
+                                                        break;
+                                                    } catch (Exception e) {
+                                                        System.out.println("error set field : " + e.getMessage());
+                                                    }
+                                                }
+                                            }
+                                            if (tempField != null) {
+                                                try {
+                                                    tempField.setAccessible(true);
+                                                    tempField.set(clazz.getDeclaredConstructor().newInstance(),
+                                                            new MySession(request.getSession()));
+                                                    System.out.println("ReqX.getSession");
+                                                } catch (Exception err) {
+                                                    System.out.println(err.getMessage());
+                                                }
+                                            }
                                             controllerClasses.add(clazz.getName());
                                         }
                                     }
@@ -289,9 +329,7 @@ public class FrontServlet extends HttpServlet {
                     throw new Exception("ETU002479 : Erreur servlet de parametre misy tsy annoté");
                 }
             }
-        } catch (
-
-        Exception e) {
+        } catch (Exception e) {
             // e.printStackTrace(out);
             out.println(e.getMessage());
         }
