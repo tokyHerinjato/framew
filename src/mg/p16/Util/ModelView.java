@@ -3,28 +3,28 @@ package mg.p16.Util;
 import java.util.HashMap;
 
 public class ModelView {
-    private String GET;
+    private String url;
     private HashMap<String, Object> data;
 
-    public ModelView(String GET) {
-        this.GET = GET;
+    public ModelView(String url) {
+        this.url = url;
         this.data = new HashMap<>();
     }
 
     public ModelView() {
     }
 
-    public ModelView(String GET, HashMap<String, Object> data) {
-        this.GET = GET;
+    public ModelView(String url, HashMap<String, Object> data) {
+        this.url = url;
         this.data = data != null ? data : new HashMap<>(); // Ensure data is not null
     }
 
-    public String getGET() {
-        return GET;
+    public String getUrl() {
+        return url;
     }
 
-    public void setGET(String GET) {
-        this.GET = GET;
+    public void setUrl(String url) {
+        this.url = url;
     }
 
     public HashMap<String, Object> getData() {
