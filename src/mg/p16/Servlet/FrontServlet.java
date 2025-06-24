@@ -22,14 +22,16 @@ import com.google.gson.Gson;
 
 import mg.p16.Annotation.ControllerAnnotation;
 import mg.p16.Annotation.FieldAnnotation;
+import mg.p16.Annotation.Get;
 import mg.p16.Annotation.JsonAnnotation;
-import mg.p16.Annotation.GET;
-import mg.p16.Annotation.POST;
+import mg.p16.Annotation.MappingAnnotation;
 import mg.p16.Annotation.ParamAnnotation;
 import mg.p16.Annotation.ParamObjectAnnotation;
+import mg.p16.Annotation.Post;
 import mg.p16.Util.Mapping;
 import mg.p16.Util.ModelView;
 import mg.p16.Util.MySession;
+import mg.p16.Util.VerbAction;
 
 public class FrontServlet extends HttpServlet {
     private String controllerPackage;
@@ -61,37 +63,30 @@ public class FrontServlet extends HttpServlet {
             } else {
                 if (mappings.containsKey(path)) {
                     Mapping m = mappings.get(path);
-                    out.println("Nom de la classe : " + m.getClassName());
-                    out.println("Nom de la méthode : " + m.getMethodeName());
-                    out.println("-------------------------------");
-
-                    // begin sprint 10
-                    String methodVerb = m.getVerb();
-                    String requestMethod = request.getMethod();
-
-                    if(!requestMethod.equalsIgnoreCase(methodVerb)) {
-                        throw new Exception("Error method from jsp page : "+methodVerb+" must be "+requestMethod);
-                    }
+                    // out.println("Nom de la classe : " + m.getClassName());
+                    // out.println("Nom de la méthode : " + m.getMethodeName());
+                    // out.println("-------------------------------");
 
                     try {
                         Class<?> clizz = Class.forName(m.getClassName());
                         Method mixx = null;
-                        for (Method method : clizz.getDeclaredMethods()) {
-                            if (method.getName().equals(m.getMethodeName())) {
-                                if(requestMethod.equalsIgnoreCase("GET") && method.isAnnotationPresent(GET.class)) {
-                                    mixx = method;
-                                    break;
-                                }
-                                if(requestMethod.equalsIgnoreCase("POST") && method.isAnnotationPresent(POST.class)) {
-                                    mixx = method;
-                                    break;
+
+                        for(VerbAction action : m.getVerbactions()) {
+                            if(action.getVerb().equalsIgnoreCase(request.getMethod())) {
+                                Class<?> c = Class.forName(m.getClassName());
+                                for (Method method : clizz.getDeclaredMethods()) {
+                                    if (method.getName().equals(action.getMethodName())) {
+                                        mixx = method;
+                                        break;
+                                    }
                                 }
                             }
                         }
 
                         if (mixx == null) {
-                            throw new NoSuchMethodException(
-                                    "Method " + m.getMethodeName() + " not found in class " + m.getClassName());
+                            // throw new NoSuchMethodException(
+                            //         "Method " + m.getClassName() + " not found in class " + m.getClassName());
+                            out.println("Error 404 : Method not found : "+m.getClassName());
                         }
 
                         out.println("Invoking method: " + mixx.getName() + " on class: " + clizz.getName());
@@ -117,8 +112,8 @@ public class FrontServlet extends HttpServlet {
                         }
                         if (result instanceof ModelView) {
                             ModelView modelView = (ModelView) result;
-                            String GETGoal = modelView.getGET();
-                            out.println("Forwarding to GET: " + GETGoal);
+                            String urlGoal = modelView.getUrl();
+                            out.println("Forwarding to URL: " + urlGoal);
                             HashMap<String, Object> data = modelView.getData();
                             System.out.println(data);
                             if (data != null) {
@@ -127,7 +122,7 @@ public class FrontServlet extends HttpServlet {
                                     out.println("Setting attribute: " + key + " = " + data.get(key));
                                 }
                             }
-                            request.getRequestDispatcher(GETGoal).forward(request, response);
+                            request.getRequestDispatcher(urlGoal).forward(request, response);
                         } else if (result instanceof String) {
                             out.println(result.toString());
                         } else {
@@ -137,7 +132,7 @@ public class FrontServlet extends HttpServlet {
                         out.println(e.getMessage());
                     }
                 } else {
-                    out.println("Aucune méthode associée à cette GET ou 404 not found");
+                    out.println("Aucune méthode associée à cette URL ou 404 not found");
                 }
             }
         } catch (Exception e) {
@@ -163,19 +158,19 @@ public class FrontServlet extends HttpServlet {
         return "FrontServlet";
     }
 
-    public Method getMethodByName(Mapping m, Class<?> clazz) {
-        try {
-            Method[] methods = clazz.getDeclaredMethods();
-            for (Method method : methods) {
-                if (method.getName().equals(m.getMethodeName())) {
-                    return method;
-                }
-            }
-        } catch (Exception e) {
-            // e.printStackTrace();
-        }
-        return null;
-    }
+    // public Method getMethodByName(Mapping m, Class<?> clazz) {
+    //     try {
+    //         Method[] methods = clazz.getDeclaredMethods();
+    //         for (Method method : methods) {
+    //             if (method.getName().equals(m.getMethodName())) {
+    //                 return method;
+    //             }
+    //         }
+    //     } catch (Exception e) {
+    //         // e.printStackTrace();
+    //     }
+    //     return null;
+    // }
 
     public static Object createParamObject(Class<?> clazz, HttpServletRequest request) throws Exception {
         Object instance = clazz.getDeclaredConstructor().newInstance();
@@ -238,7 +233,7 @@ public class FrontServlet extends HttpServlet {
                                         }
                                     }
                                 } catch (ClassNotFoundException e) {
-                                    // e.printStackTrace();
+                                    e.printStackTrace();
                                 }
                             }
                         }
@@ -269,40 +264,62 @@ public class FrontServlet extends HttpServlet {
     }
 
     public HashMap<String, Mapping> getMethodFromController(ArrayList<String> controllers)
-            throws IOException {
+            throws ServletException,IOException {
         HashMap<String, Mapping> res = new HashMap<>();
-        HashMap<String, String> urlMapping = new HashMap<>();
 
         for (String controller : controllers) {
             try {
                 Class<?> clazz = Class.forName(controller);
                 Method[] methods = clazz.getDeclaredMethods();
                 for (Method m : methods) {
-                    if (m.isAnnotationPresent(GET.class)) {
-                        String GET = m.getAnnotation(GET.class).value();
-                        if (urlMapping.containsKey(GET)) {
-                            throw new IOException("GET" + GET + " already associated");
+                    if (m.isAnnotationPresent(MappingAnnotation.class)) {
+                        String url = m.getAnnotation(MappingAnnotation.class).value();
+                        // if (urlMap.containsKey(url)) {
+                        //     throw new IOException("url" + url + " already associated");
+                        // } else {
+                            //     urlMap.put(url, clazz.getName() + "." + m.getName());
+                            //     if (!res.containsKey(url)) {
+                                //         res.put(url, new Mapping(controller, m.getName()));
+                                //     }
+                        if(!res.containsKey(url)) {
+                        res.put(url, new Mapping(clazz.getName()));
                         } else {
-                            urlMapping.put(GET, clazz.getName() + "." + m.getName());
-                            if (!res.containsKey(GET)) {
-                                res.put(GET, new Mapping(controller, m.getName(), "GET"));
-                            }
+                            throw new ServletException("url" + url + " already associated");
+                            
                         }
-                    } else if(m.isAnnotationPresent(POST.class)) {
-                        String POST = m.getAnnotation(POST.class).value();
-                        if (urlMapping.containsKey(POST)) {
-                            throw new IOException("POST" + POST + " already associated");
-                        } else {
-                            urlMapping.put(POST, clazz.getName() + "." + m.getName());
-                            if (!res.containsKey(POST)) {
-                                res.put(POST, new Mapping(controller, m.getName(), "POST"));
-                            }
+
+                        String nameClass = clazz.getName();
+                        String methodName = m.getName();
+
+                        boolean isGet = m.isAnnotationPresent(Get.class);
+                        boolean isPost = m.isAnnotationPresent(Post.class);
+
+                        if(!isGet && !isPost) {
+                            isGet = true;
                         }
-                        
+
+                        String verb = null;
+                        if(isGet) {
+                            verb="GET";
+                        }
+                        else {
+                            verb="POST";
+                        }
+                        try {
+                            res.get(url).addVerbAction(methodName, verb);
+                        } catch (Exception e) {
+                            throw new Exception("error addVerbAction : "+e.getMessage());
+                        }
+
+                        System.out.println("Methode annotee : "+m.getName());
+                        System.out.println("Annotation value : "+url);
+
                     }
                 }
-            } catch (ClassNotFoundException e) {
+                
+            } catch (Exception e) {
                 // e.printStackTrace();
+                throw new ServletException("Erreur : Package introuvable");
             }
         }
         return res;
