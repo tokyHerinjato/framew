@@ -1,17 +1,17 @@
 package mg.p16.Util;
 
-public class Mapping {
-    private String className;
-    private String methodeName;
-    private String verb;
+import java.lang.reflect.Method;
 
-    public Mapping() {
+public class Mapping {
+    String className;
+    String methodName;
+
+    public String getMethodName() {
+        return methodName;
     }
 
-    public Mapping(String className, String methodeName, String verb) {
-        this.className = className;
-        this.methodeName = methodeName;
-        this.verb = verb;
+    public void setMethodName(String methodName) {
+        this.methodName = methodName;
     }
 
     public String getClassName() {
@@ -22,21 +22,20 @@ public class Mapping {
         this.className = className;
     }
 
-    public String getMethodeName() {
-        return methodeName;
+    public Mapping() {
     }
 
-    public void setMethodeName(String methodeName) {
-        this.methodeName = methodeName;
+    public Mapping(String className, String methodName) {
+        setClassName(className);
+        setMethodName(methodName);
     }
 
-    public String getVerb() {
-        return verb;
+    // to execute the method inside the controllers annoted by a map
+    public Object invokeMethod() throws Exception {
+        Class<?> clazz = Class.forName(className);
+        Method method = clazz.getDeclaredMethod(methodName);
+        Object in_stance = clazz.getDeclaredConstructor().newInstance();
+        return method.invoke(in_stance);
     }
 
-    public void setVerb(String verb) {
-        this.verb = verb;
-    }
-
-    
 }

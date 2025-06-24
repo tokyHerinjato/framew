@@ -8,29 +8,36 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
 import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
+import javax.servlet.http.Part;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.RequestDispatcher;
+import javax.servlet.annotation.MultipartConfig;
 
 import com.google.gson.Gson;
 
 import mg.p16.Annotation.ControllerAnnotation;
 import mg.p16.Annotation.FieldAnnotation;
+import mg.p16.Annotation.Get;
 import mg.p16.Annotation.JsonAnnotation;
-import mg.p16.Annotation.GET;
-import mg.p16.Annotation.POST;
+import mg.p16.Annotation.MappingAnnotation;
 import mg.p16.Annotation.ParamAnnotation;
 import mg.p16.Annotation.ParamObjectAnnotation;
+import mg.p16.Annotation.Post;
 import mg.p16.Util.Mapping;
 import mg.p16.Util.ModelView;
 import mg.p16.Util.MySession;
+import mg.p16.Util.VerbAction;
+import mg.p16.Util.FilePart;
+import mg.p16.Util.Multipart;
 
+@MultipartConfig
 public class FrontServlet extends HttpServlet {
     private String controllerPackage;
     private ArrayList<String> controllerNames;
@@ -61,43 +68,33 @@ public class FrontServlet extends HttpServlet {
             } else {
                 if (mappings.containsKey(path)) {
                     Mapping m = mappings.get(path);
-                    out.println("Nom de la classe : " + m.getClassName());
-                    out.println("Nom de la méthode : " + m.getMethodeName());
-                    out.println("-------------------------------");
-
-                    // begin sprint 10
-                    String methodVerb = m.getVerb();
-                    String requestMethod = request.getMethod();
-
-                    if(!requestMethod.equalsIgnoreCase(methodVerb)) {
-                        throw new Exception("Error method from jsp page : "+methodVerb+" must be "+requestMethod);
-                    }
+                    // out.println("Nom de la classe : " + m.getClassName());
+                    // out.println("Nom de la méthode : " + m.getMethodeName());
+                    // out.println("-------------------------------");
 
                     try {
                         Class<?> clizz = Class.forName(m.getClassName());
                         Method mixx = null;
-                        for (Method method : clizz.getDeclaredMethods()) {
-                            if (method.getName().equals(m.getMethodeName())) {
-                                if(requestMethod.equalsIgnoreCase("GET") && method.isAnnotationPresent(GET.class)) {
-                                    mixx = method;
-                                    break;
-                                }
-                                if(requestMethod.equalsIgnoreCase("POST") && method.isAnnotationPresent(POST.class)) {
-                                    mixx = method;
-                                    break;
-                                }
+                        for(Method method : clizz.getDeclaredMethods()) {
+                            if (method.getName().equals(m.getMethodName())) {
+                                mixx = method;
+                                break;
                             }
                         }
 
                         if (mixx == null) {
+                            out.println("Error 404 : Method not found : "+m.getClassName());
                             throw new NoSuchMethodException(
-                                    "Method " + m.getMethodeName() + " not found in class " + m.getClassName());
+                                    "Method " + m.getClassName() + " not found in class " + m.getClassName());
                         }
 
                         out.println("Invoking method: " + mixx.getName() + " on class: " + clizz.getName());
+                        System.out.println("Invoking method: " + mixx.getName() + " on class: " + clizz.getName());
                         Object[] params = this.getParameterValue(request, mixx, ParamAnnotation.class, out);
-                        Object result = mixx.invoke(clizz.newInstance(), params);
+                        Object result = null;
+                        result = mixx.invoke(clizz.newInstance(), params);
                         out.println("Resultat de la méthode : " + result);
+
 
                         if(mixx.isAnnotationPresent(JsonAnnotation.class)) {
                             if(result instanceof ModelView) {                                
@@ -117,8 +114,8 @@ public class FrontServlet extends HttpServlet {
                         }
                         if (result instanceof ModelView) {
                             ModelView modelView = (ModelView) result;
-                            String GETGoal = modelView.getGET();
-                            out.println("Forwarding to GET: " + GETGoal);
+                            String urlGoal = modelView.getUrl();
+                            out.println("Forwarding to URL: " + urlGoal);
                             HashMap<String, Object> data = modelView.getData();
                             System.out.println(data);
                             if (data != null) {
@@ -127,7 +124,7 @@ public class FrontServlet extends HttpServlet {
                                     out.println("Setting attribute: " + key + " = " + data.get(key));
                                 }
                             }
-                            request.getRequestDispatcher(GETGoal).forward(request, response);
+                            request.getRequestDispatcher(urlGoal).forward(request, response);
                         } else if (result instanceof String) {
                             out.println(result.toString());
                         } else {
@@ -137,7 +134,7 @@ public class FrontServlet extends HttpServlet {
                         out.println(e.getMessage());
                     }
                 } else {
-                    out.println("Aucune méthode associée à cette GET ou 404 not found");
+                    out.println("Aucune méthode associée à cette URL ou 404 not found");
                 }
             }
         } catch (Exception e) {
@@ -163,19 +160,19 @@ public class FrontServlet extends HttpServlet {
         return "FrontServlet";
     }
 
-    public Method getMethodByName(Mapping m, Class<?> clazz) {
-        try {
-            Method[] methods = clazz.getDeclaredMethods();
-            for (Method method : methods) {
-                if (method.getName().equals(m.getMethodeName())) {
-                    return method;
-                }
-            }
-        } catch (Exception e) {
-            // e.printStackTrace();
-        }
-        return null;
-    }
+    // public Method getMethodByName(Mapping m, Class<?> clazz) {
+    //     try {
+    //         Method[] methods = clazz.getDeclaredMethods();
+    //         for (Method method : methods) {
+    //             if (method.getName().equals(m.getMethodName())) {
+    //                 return method;
+    //             }
+    //         }
+    //     } catch (Exception e) {
+    //         // e.printStackTrace();
+    //     }
+    //     return null;
+    // }
 
     public static Object createParamObject(Class<?> clazz, HttpServletRequest request) throws Exception {
         Object instance = clazz.getDeclaredConstructor().newInstance();
@@ -238,7 +235,7 @@ public class FrontServlet extends HttpServlet {
                                         }
                                     }
                                 } catch (ClassNotFoundException e) {
-                                    // e.printStackTrace();
+                                    e.printStackTrace();
                                 }
                             }
                         }
@@ -269,40 +266,34 @@ public class FrontServlet extends HttpServlet {
     }
 
     public HashMap<String, Mapping> getMethodFromController(ArrayList<String> controllers)
-            throws IOException {
+            throws ServletException,IOException {
         HashMap<String, Mapping> res = new HashMap<>();
-        HashMap<String, String> urlMapping = new HashMap<>();
+        HashMap<String, String> urlMap = new HashMap<>();
 
         for (String controller : controllers) {
             try {
                 Class<?> clazz = Class.forName(controller);
                 Method[] methods = clazz.getDeclaredMethods();
                 for (Method m : methods) {
-                    if (m.isAnnotationPresent(GET.class)) {
-                        String GET = m.getAnnotation(GET.class).value();
-                        if (urlMapping.containsKey(GET)) {
-                            throw new IOException("GET" + GET + " already associated");
+                    if (m.isAnnotationPresent(MappingAnnotation.class)) {
+                        String url = m.getAnnotation(MappingAnnotation.class).value();
+                        if (urlMap.containsKey(url)) {
+                            throw new IOException("url" + url + " already associated");
                         } else {
-                            urlMapping.put(GET, clazz.getName() + "." + m.getName());
-                            if (!res.containsKey(GET)) {
-                                res.put(GET, new Mapping(controller, m.getName(), "GET"));
-                            }
-                        }
-                    } else if(m.isAnnotationPresent(POST.class)) {
-                        String POST = m.getAnnotation(POST.class).value();
-                        if (urlMapping.containsKey(POST)) {
-                            throw new IOException("POST" + POST + " already associated");
-                        } else {
-                            urlMapping.put(POST, clazz.getName() + "." + m.getName());
-                            if (!res.containsKey(POST)) {
-                                res.put(POST, new Mapping(controller, m.getName(), "POST"));
-                            }
+                            urlMap.put(url, clazz.getName() + "." + m.getName());
+                            res.put(url, new Mapping(controller, m.getName()));
                         }
                         
+
+                        System.out.println("Methode annotee : "+m.getName());
+                        System.out.println("Annotation value : "+url);
+
                     }
                 }
-            } catch (ClassNotFoundException e) {
+                
+            } catch (Exception e) {
                 // e.printStackTrace();
+                throw new ServletException("Erreur : Package introuvable");
             }
         }
         return res;
@@ -347,8 +338,49 @@ public class FrontServlet extends HttpServlet {
                     parameterValues[i] = new MySession(request.getSession());
                     System.out.println("req.getSession()");
                 } else if (parameter.isAnnotationPresent(ParamAnnotation.class)) {
+                    System.out.println("parammmmmmmmm -------------------------------------------------------");
                     String paramName = parameter.getAnnotation(ParamAnnotation.class).value();
-                    parameterValues[i] = request.getParameter(paramName);
+                    System.out.println("Parameter name: " + paramName); // Affiche le nom du paramètre
+
+                    System.out.println();
+
+                    if (parameters[i].getType().equals(Multipart.class)) {
+                        System.out.println("Parameter type: " + parameters[i].getType()); // Affiche le type du paramètre
+
+                        Part part;
+                        System.out.println("uiuhiuhiuhih");
+                        System.out.println("Request Method: " + request.getMethod()); 
+                        System.out.println("Content-Type: " + request.getContentType());  // Cela doit être "multipart/form-data"
+                        try {
+                            System.out.println("poooooooooooo");
+                            part = request.getPart(paramName);
+                            System.out.println("Retrieving part for: " + part.getSubmittedFileName()); // Affiche un message pour indiquer qu'on récupère la partie
+                            if (part == null) {
+                                System.out.println("Part is null for parameter: " + paramName);
+                            } else {
+                                System.out.println("Part retrieved successfully: " + part.getSubmittedFileName());
+                            }
+                            if (part != null) {
+                                System.out.println("File submitted: " + part.getSubmittedFileName()); // Affiche le nom du fichier soumis
+                                System.out.println("Processing file part for: " + paramName); // Message de traitement de la partie
+    
+                                parameterValues[i] = new Multipart(part.getSubmittedFileName(), part.getSize(), part.getInputStream());
+                            } else {
+                                System.out.println("No file submitted for: " + paramName); // Affiche si aucun fichier n'est soumis
+                                parameterValues[i] = null;
+                            }
+                        } catch (Exception e) {
+                            System.err.println("erreurrrrr : "+e.getMessage());
+                        }
+                    } else {
+                        String paramValue = request.getParameter(paramName);
+                        System.out.println("Retrieving parameter value for: " + paramName + " = " + paramValue); // Affiche la valeur du paramètre
+
+                        parameterValues[i] = convertParameterValue(paramValue, parameters[i].getType());
+                    }
+
+                    System.out.println("-------------------------------------------------------");
+
                 } else if (parameter.isAnnotationPresent(ParamObjectAnnotation.class)) {
                     parameterValues[i] = createParamObject(parameter.getType(), request);
                 } else {
