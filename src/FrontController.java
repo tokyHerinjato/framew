@@ -7,34 +7,32 @@ import java.util.Map;
 import java.util.List;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpSession;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.RequestDispatcher;
 import javax.servlet.annotation.MultipartConfig;
 
-import annotations.AnnotationController;
-import annotations.MappingAnnotation;
-import annotations.ParamAnnotation;
-import annotations.ParamObjectAnnotation;
-import annotations.ResponseAnnotation;
+import annotations.*;
 
 import com.google.gson.Gson;
 
 import java.lang.reflect.*;
 
 import utils.Mapping;
-import utils.Function;
-import utils.ModelView;
-import utils.MySession;
 import utils.*;
 
 public class FrontController extends HttpServlet {
     private List<String> controllers;
     private HashMap<String, Mapping> map;
+    private String authValue;
+    private String roleValue; 
 
     @Override
     public void init() throws ServletException {
         String packageToScan = this.getInitParameter("package");
+        this.authValue = this.getInitParameter("auth_name");
+        this.roleValue = this.getInitParameter("role_name");
         try {
             this.controllers = new Function().getAllclazzsStringAnnotation(packageToScan, AnnotationController.class);
             this.map = new Function().scanControllersMethods(this.controllers);
@@ -86,8 +84,30 @@ public class FrontController extends HttpServlet {
                 out.println("Méthode non trouvée : " + m.getMethodName());
                 return;
             }
+            if (targetMethod.isAnnotationPresent(Auth.class)) {
+                if (request.getSession(false) == null || request.getSession(false).getAttribute(this.authValue) == null) {
+                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized action");
+                    return;
+                }
+            }
 
-            Object[] params = Function.getParameterValue(request, targetMethod, ParamAnnotation.class, ParamObjectAnnotation.class);
+            if (targetMethod.isAnnotationPresent(Role.class)) {
+                Role role = targetMethod.getAnnotation(Role.class);
+                String role_name = role.value();
+
+                // Vérifiez la session HTTP
+                HttpSession session = request.getSession(false); // Ne crée pas de session si elle n'existe pas
+                if (session == null || !role_name.equals(session.getAttribute("role"))) {
+                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized action: " + path);
+                    return;
+                }
+            }
+
+
+            
+
+            Object[] params = Function.getParameterValue(request, response, targetMethod, ParamAnnotation.class, ParamObjectAnnotation.class);
+
             Object controllerInstance = clazz.getDeclaredConstructor().newInstance();
 
             // Initialize MySession if required by the controller

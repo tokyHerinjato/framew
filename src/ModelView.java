@@ -6,6 +6,11 @@ public class ModelView {
     String url;
     HashMap<String, Object> data;
 
+
+    public ModelView() {
+        this.data = new HashMap<>();
+    }
+
     public ModelView(String url) {
         this.url = url;
         this.data = new HashMap<>();

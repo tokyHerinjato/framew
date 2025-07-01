@@ -5,9 +5,12 @@ import java.lang.reflect.*;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.*;
+import javax.servlet.*;
 import javax.servlet.ServletException;
 
 import annotations.AnnotationController;
@@ -15,6 +18,7 @@ import annotations.MappingAnnotation;
 import annotations.ParamAnnotation;
 import annotations.ParamObjectAnnotation;
 import annotations.TypeValidationAnnotation;
+import annotations.isError;
 
 public class Function {
     boolean isController(Class<?> c) {
@@ -106,12 +110,13 @@ public class Function {
         return null;
     }
 
-    // Map string, string  pour stocker les noms des fields et les erreurs
+    // Map string, string  pour stocker les noms des fields name et les erreurs
     // Map string, string pour stocker les nom des fields et les valeurs appropriés
-    public static List<String> verifyValidation(Object obj) throws IllegalAccessException {
-        List<String> errors = new ArrayList<>();
+    public static Map<String, String> verifyValidation(Object obj) throws IllegalAccessException {
+        Map<String, String> errors =  new HashMap<>();
+        Field[] fields = obj.getClass().getDeclaredFields();
 
-        for (Field field : obj.getClass().getDeclaredFields()) {
+        for (Field field : fields) {
             field.setAccessible(true); 
 
             Object value = field.get(obj);
@@ -119,49 +124,49 @@ public class Function {
             if (field.isAnnotationPresent(TypeValidationAnnotation.NotNull.class)) {
                 TypeValidationAnnotation.NotNull notNull = field.getAnnotation(TypeValidationAnnotation.NotNull.class);
                 if (value == null) {
-                    errors.add(notNull.value());
+                    errors.put(field.getName(), notNull.value());
                 }
             }
 
             if (field.isAnnotationPresent(TypeValidationAnnotation.Min.class) && value instanceof Number) {
                 TypeValidationAnnotation.Min min = field.getAnnotation(TypeValidationAnnotation.Min.class);
                 if (((Number) value).intValue() < min.value()) {
-                    errors.add(min.message());
+                    errors.put(field.getName(), min.message());
                 }
             }
 
             if (field.isAnnotationPresent(TypeValidationAnnotation.Max.class) && value instanceof Number) {
                 TypeValidationAnnotation.Max max = field.getAnnotation(TypeValidationAnnotation.Max.class);
                 if (((Number) value).intValue() > max.value()) {
-                    errors.add(max.message());
+                    errors.put(field.getName(), max.message());
                 }
             }
 
             if (field.isAnnotationPresent(TypeValidationAnnotation.Pattern.class) && value != null) {
                 TypeValidationAnnotation.Pattern pattern = field.getAnnotation(TypeValidationAnnotation.Pattern.class);
                 if (!value.toString().matches(pattern.regex())) {
-                    errors.add(pattern.message());
+                    errors.put(field.getName(), pattern.message());
                 }
             }
 
             if (field.isAnnotationPresent(TypeValidationAnnotation.NotEmpty.class) && value != null) {
                 TypeValidationAnnotation.NotEmpty notEmpty = field.getAnnotation(TypeValidationAnnotation.NotEmpty.class);
                 if (value.toString().isEmpty()) {
-                    errors.add(notEmpty.message());
+                    errors.put(field.getName(), notEmpty.message());
                 }
             }
 
             if (field.isAnnotationPresent(TypeValidationAnnotation.Positive.class) && value instanceof Number) {
                 TypeValidationAnnotation.Positive positive = field.getAnnotation(TypeValidationAnnotation.Positive.class);
                 if (((Number) value).intValue() <= 0) {
-                    errors.add(positive.message());
+                    errors.put(field.getName(), positive.message());
                 }
             }
         }
         return errors;
     }
 
-    public static Object[] getParameterValue(HttpServletRequest request, Method method,
+    public static Object[] getParameterValue(HttpServletRequest request, HttpServletResponse response, Method method,
             Class<ParamAnnotation> annotationClass,
             Class<ParamObjectAnnotation> paramObjectAnnotationClass) throws Exception {
         Parameter[] parameters = method.getParameters();
@@ -181,20 +186,41 @@ public class Function {
                 String objName = paramObject.objName();
                 try {
                     Object paramObjectInstance = parameters[i].getType().getDeclaredConstructor().newInstance();
+
+                    Map<String, String> fieldsValues = new HashMap<>();
+                    Map<String, String> validationErrors = new HashMap<>();
+
                     Field[] fields = parameters[i].getType().getDeclaredFields();
+
                     for (Field field : fields) {
                         String fieldName = field.getName();
                         String paramValue = request.getParameter(objName + "." + fieldName);
                         System.out.println("Field: " + objName + "." + fieldName + " = " + paramValue);
+                        fieldsValues.put(fieldName, paramValue);
                         if (paramValue != null) {
                             field.setAccessible(true);
                             field.set(paramObjectInstance, convertParameterValue(paramValue, field.getType()));
                         }
                     }
-                    List<String> validationErrors = verifyValidation(paramObjectInstance);
+                    validationErrors = verifyValidation(paramObjectInstance);
                     if (!validationErrors.isEmpty()) {
+                        request.setAttribute("errors", validationErrors);
+                        request.setAttribute("values", fieldsValues);
+                        
+                        isError iserr = method.getAnnotation(isError.class);
+                        if(iserr != null) {
+                            String errUrl = iserr.url();
+                            HttpServletRequest wrappedRequest = new HttpServletRequestWrapper(request) {
+
+                                @Override
+                                public String getMethod() {
+                                    return "GET";
+                                }
+                            };
+                            RequestDispatcher dispatcher = request.getRequestDispatcher(errUrl);
+                            dispatcher.forward(wrappedRequest, response);
+                        }
                         System.out.println("Validation errors for object: " + objName);
-                        validationErrors.forEach(System.out::println);
                         throw new Exception("Validation errors: " + validationErrors);
                     }
                     parameterValues[i] = paramObjectInstance;
@@ -209,4 +235,21 @@ public class Function {
         return parameterValues;
     }
 }
+
+/* Sprint 15: faire une authentification @auth("admin") 
+ * Objectif: mettre une authentification pour permettre à tel et tel personnage de faire une action comme modifier et supprimer
+ * Comment: mettre un level:
+ * 1- Level 1: secretaire
+ * 2- Level 2: manager
+ * 3- Level 3: directeur
+ * -> Si je dis que le level est 1, le 1, 2, et 3 ont accès
+ * > Si je dis que le level est 2, seul le 2 et le 3 ont accès
+ * -> Si je dis que le level est 3, seul le 3 ont accès
+ * 
+ */
+/* Principe de routage dans un framework 
+ * /emp/edit/10 au lieu de /emp.php?action=edit&id=10
+*/
+/* Sprint 16:  Au niveau classe no asina annotation @Auth */
+
 
