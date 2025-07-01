@@ -1,19 +1,10 @@
 package mg.p16.Util;
 
-import java.util.HashSet;
 import java.util.Set;
 
 public class Mapping {
     private String className;
     private Set<VerbAction> verbactions;
-
-    public Mapping() {
-    }
-
-    public Mapping(String className) {
-        this.className = className;
-        this.verbactions = new HashSet<>();
-    }
 
     public String getClassName() {
         return className;
@@ -23,17 +14,11 @@ public class Mapping {
         this.className = className;
     }
 
-    public Set<VerbAction> getVerbactions() {
-        return verbactions;
+    public Mapping() {
     }
-   
-    public void addVerbAction(String methodName, String verb) throws Exception {
-        // Vérifiez si le verbe est déjà utilisé
-        for (VerbAction action : verbactions) {
-            if (action.getVerb().equals(verb)) {
-                throw new Exception("HTTP verb " + verb + " already used by method: " + action.getMethodName());
-            }
-        }       
-        verbactions.add(new VerbAction(methodName, verb));
+
+    public Mapping(String className, String methodName) {
+        setClassName(className);
     }
+
 }
