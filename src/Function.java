@@ -63,7 +63,7 @@ public class Function {
             Method[] meths = clazz.getDeclaredMethods();
             for (Method method : meths) {
                 if (method.isAnnotationPresent(MappingAnnotation.class)) {
-                    String url = method.getAnnotation(MappingAnnotation.class).value();
+                    String url = method.getAnnotation(MappingAnnotation.class).url();
                     // Vérifier si l'URL est déjà présente dans la map
                     if (urlMap.containsKey(url)) {
                         String method_present = urlMap.get(url);
@@ -235,4 +235,21 @@ public class Function {
         return parameterValues;
     }
 }
+
+/* Sprint 15: faire une authentification @auth("admin") 
+ * Objectif: mettre une authentification pour permettre à tel et tel personnage de faire une action comme modifier et supprimer
+ * Comment: mettre un level:
+ * 1- Level 1: secretaire
+ * 2- Level 2: manager
+ * 3- Level 3: directeur
+ * -> Si je dis que le level est 1, le 1, 2, et 3 ont accès
+ * > Si je dis que le level est 2, seul le 2 et le 3 ont accès
+ * -> Si je dis que le level est 3, seul le 3 ont accès
+ * 
+ */
+/* Principe de routage dans un framework 
+ * /emp/edit/10 au lieu de /emp.php?action=edit&id=10
+*/
+/* Sprint 16:  Au niveau classe no asina annotation @Auth */
+
 

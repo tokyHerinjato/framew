@@ -6,13 +6,14 @@ public class ModelView {
     String url;
     HashMap<String, Object> data;
 
+
+    public ModelView() {
+        this.data = new HashMap<>();
+    }
+
     public ModelView(String url) {
         this.url = url;
         this.data = new HashMap<>();
-    }
-    public ModelView(String url, HashMap map) {
-        this.url = url;
-        this.data = map;
     }
 
     public String getUrl() {
@@ -27,16 +28,7 @@ public class ModelView {
         return data;
     }
 
-    public void setData(HashMap<String, Object> data) {
-        this.data = data;
-    }
-
     public void addObject(String key, Object value) {
         this.data.put(key, value);
     }
-
-    public Object getObject(String key) {
-        return this.data.get(key);
-    }
-    
 }
